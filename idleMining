@@ -39,8 +39,8 @@ def activeChanged(param):
 	global miner
 	try:
 		logging.info('ActiveChanged signal = {}'.format(param))
-		if param and miner is None:
-			cmd = '/home/dlk/ethereum/gminer/miner --algo ethash --server eth.2miners.com:2020 --user 0xa5B34936D76037B4074d3633632c55A163e0C6F1.{} --api 10050'.format(hostname)
+		if param and miner is None:			
+			cmd = '/home/dlk/ethereum/gminer/miner --algo ethash --server eth.2miners.com:2020 --user 16xhz7paBrozb71r2rzCSjM7HctLrJsvuB.{} --api 10050'.format(hostname)
 			miner = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 			logging.info('started miner')
 		elif not param and miner is not None:
