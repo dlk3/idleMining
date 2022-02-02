@@ -35,15 +35,17 @@ logging.basicConfig(filename='/tmp/idleMining.log', encoding='utf-8', level=logg
 import socket
 hostname = socket.gethostname().split('.')[0]
 
-#  SIGTERM handler.  Kills "xscreensaver-command" child process.
+#  When script terminates also terminate the "xscreenserver-command -watch"
+#  child process
 def kill_xscrcommand(signum, frame):
-	logging.info('kill_xscrcommand function invoked')
+	global xscr_proc
 	if xscr_proc is not None:
 		logging.info('terminating xscreensaver-command child process')
 		xscr_proc.terminate()
 		xscr_proc.communicate()
+		xscr_proc = None
 	exit()
-
+	
 #  Start/stop miner		
 def activeChanged(param):
 	global miner
@@ -79,6 +81,7 @@ def dbusMonitor():
 
 #  Watch "xscreensaver-command -watch" command output for screensaver events
 def xscreensaverMonitor():
+	global xscr_proc
 	try:
 		logging.info('starting xscreensaverMonitor thread')
 		cmd = 'xscreensaver-command -watch'
@@ -89,27 +92,31 @@ def xscreensaverMonitor():
 				activeChanged(True)
 			elif line.startswith('UNBLANK '):
 				activeChanged(False)
+	except ValueError as e:
+		if not str(e).startswith('PyMemoryView_FromBuffer()'):
+			logging.exception('ValueError exception in xscreenSaver thread:\n{}\n\n'.format(e))
 	except Exception as e:
 		logging.exception('unexpected exception in xscreenSaver thread:\n{}\n\n'.format(e))
 		
 try:
-	#  Terminate "xscreensaver-command" child process on SIGTERM
+	#  When script terminates also terminate the "xscreenserver-command -watch"
+	#  child process
 	import signal
 	signal.signal(signal.SIGTERM, kill_xscrcommand)
-
+	
 	#  Start each screensaver monitor running it a seperate thread
 	xscr_proc = None
 	miner = None
 	dbus_thread = threading.Thread(target=dbusMonitor)
+	dbus_thread.daemon = True
 	dbus_thread.start()
 	if shutil.which('xscreensaver-command') is not None:
 		xscreensaver_thread = threading.Thread(target=xscreensaverMonitor)
+		xscreensaver_thread.daemon = True
 		xscreensaver_thread.start()
 		xscreensaver_thread.join()
 	dbus_thread.join()
 except KeyboardInterrupt:
 	logging.info('terminated with Ctrl-C')
-	kill_xscrcommand(None, None)
 except Exception as e:
 	logging.exception('unexpected exception in main:\n{}\n\n'.format(e))
-	kill_xscrcommand(None, None)
