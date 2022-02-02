@@ -35,6 +35,16 @@ logging.basicConfig(filename='/tmp/idleMining.log', encoding='utf-8', level=logg
 import socket
 hostname = socket.gethostname().split('.')[0]
 
+#  SIGTERM handler.  Kills "xscreensaver-command" child process.
+def kill_xscrcommand(signum, frame):
+	logging.info('kill_xscrcommand function invoked')
+	if xscr_proc is not None:
+		logging.info('terminating xscreensaver-command child process')
+		xscr_proc.terminate()
+		xscr_proc.communicate()
+	exit()
+
+#  Start/stop miner		
 def activeChanged(param):
 	global miner
 	try:
@@ -51,6 +61,7 @@ def activeChanged(param):
 	except Exception as e:	
 		logging.exception('unexpected exception in activeChanged function:\n{}\n\n'.format(e))
 
+#  Watch dbus for screensaver events
 def dbusMonitor():
 	try:
 		logging.info('starting dbusMonitor thread')
@@ -66,21 +77,28 @@ def dbusMonitor():
 	except Exception as e:	
 		logging.exception('unexpected exception in dbusMonitor thread:\n{}\n\n'.format(e))
 
+#  Watch "xscreensaver-command -watch" command output for screensaver events
 def xscreensaverMonitor():
 	try:
 		logging.info('starting xscreensaverMonitor thread')
 		cmd = 'xscreensaver-command -watch'
-		proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		xscr_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		while True:
-			line = proc.stdout.readline().decode('utf-8').strip()
+			line = xscr_proc.stdout.readline().decode('utf-8').strip()
 			if (line.startswith('BLANK ') or line.startswith('LOCK ')):
 				activeChanged(True)
 			elif line.startswith('UNBLANK '):
 				activeChanged(False)
 	except Exception as e:
 		logging.exception('unexpected exception in xscreenSaver thread:\n{}\n\n'.format(e))
-
+		
 try:
+	#  Terminate "xscreensaver-command" child process on SIGTERM
+	import signal
+	signal.signal(signal.SIGTERM, kill_xscrcommand)
+
+	#  Start each screensaver monitor running it a seperate thread
+	xscr_proc = None
 	miner = None
 	dbus_thread = threading.Thread(target=dbusMonitor)
 	dbus_thread.start()
@@ -91,5 +109,7 @@ try:
 	dbus_thread.join()
 except KeyboardInterrupt:
 	logging.info('terminated with Ctrl-C')
+	kill_xscrcommand(None, None)
 except Exception as e:
 	logging.exception('unexpected exception in main:\n{}\n\n'.format(e))
+	kill_xscrcommand(None, None)
