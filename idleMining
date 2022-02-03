@@ -40,7 +40,7 @@ hostname = socket.gethostname().split('.')[0]
 def kill_xscrcommand(signum, frame):
 	global xscr_proc
 	if xscr_proc is not None:
-		logging.info('terminating xscreensaver-command child process')
+		logging.info('terminating xscreensaver-command -watch child process')
 		xscr_proc.terminate()
 		xscr_proc.communicate()
 		xscr_proc = None
@@ -67,7 +67,7 @@ def activeChanged(param):
 def xscreensaverMonitor():
 	global xscr_proc
 	try:
-		logging.info('starting xscreensaverMonitor thread')
+		logging.info('starting xscreensaver-command -watch thread')
 		cmd = 'xscreensaver-command -watch'
 		xscr_proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		while True:
@@ -78,9 +78,9 @@ def xscreensaverMonitor():
 				activeChanged(False)
 	except ValueError as e:
 		if not str(e).startswith('PyMemoryView_FromBuffer()'):
-			logging.exception('ValueError exception in xscreenSaver thread:\n{}\n\n'.format(e))
+			logging.exception('ValueError exception in xscreenSaver-command -watch thread:\n{}\n\n'.format(e))
 	except Exception as e:
-		logging.exception('unexpected exception in xscreenSaver thread:\n{}\n\n'.format(e))
+		logging.exception('unexpected exception in xscreenSaver-command -watch thread:\n{}\n\n'.format(e))
 		
 try:
 	#  When script terminates also terminate the "xscreenserver-command -watch"
@@ -98,7 +98,7 @@ try:
 		xscreensaver_thread.start()
 
 	#  Watch dbus for Gnome or Freedesktop screensaver events
-	logging.info('starting dbusMonitor')
+	logging.info('monitoring dbus for screensaver signals')
 	from pydbus import SessionBus
 	bus = SessionBus()
 	gnome_proxy = bus.get('org.gnome.ScreenSaver')
