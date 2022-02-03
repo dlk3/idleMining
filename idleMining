@@ -63,22 +63,6 @@ def activeChanged(param):
 	except Exception as e:	
 		logging.exception('unexpected exception in activeChanged function:\n{}\n\n'.format(e))
 
-#  Watch dbus for screensaver events
-def dbusMonitor():
-	try:
-		logging.info('starting dbusMonitor thread')
-		from pydbus import SessionBus
-		bus = SessionBus()
-		gnome_proxy = bus.get('org.gnome.ScreenSaver')
-		gnome_con = gnome_proxy.ActiveChanged.connect(activeChanged)
-		freedesktop_proxy = bus.get('org.freedesktop.ScreenSaver')
-		freedesktop_con = freedesktop_proxy.ActiveChanged.connect(activeChanged)
-		from gi.repository import GLib
-		loop = GLib.MainLoop()
-		loop.run()
-	except Exception as e:	
-		logging.exception('unexpected exception in dbusMonitor thread:\n{}\n\n'.format(e))
-
 #  Watch "xscreensaver-command -watch" command output for screensaver events
 def xscreensaverMonitor():
 	global xscr_proc
@@ -104,18 +88,26 @@ try:
 	import signal
 	signal.signal(signal.SIGTERM, kill_xscrcommand)
 	
-	#  Start each screensaver monitor running it a seperate thread
 	xscr_proc = None
 	miner = None
-	dbus_thread = threading.Thread(target=dbusMonitor)
-	dbus_thread.daemon = True
-	dbus_thread.start()
+
+	#  If xscreensaver is installed, watch for its events
 	if shutil.which('xscreensaver-command') is not None:
 		xscreensaver_thread = threading.Thread(target=xscreensaverMonitor)
 		xscreensaver_thread.daemon = True
 		xscreensaver_thread.start()
-		xscreensaver_thread.join()
-	dbus_thread.join()
+
+	#  Watch dbus for Gnome or Freedesktop screensaver events
+	logging.info('starting dbusMonitor')
+	from pydbus import SessionBus
+	bus = SessionBus()
+	gnome_proxy = bus.get('org.gnome.ScreenSaver')
+	gnome_con = gnome_proxy.ActiveChanged.connect(activeChanged)
+	freedesktop_proxy = bus.get('org.freedesktop.ScreenSaver')
+	freedesktop_con = freedesktop_proxy.ActiveChanged.connect(activeChanged)
+	from gi.repository import GLib
+	loop = GLib.MainLoop()
+	loop.run()
 except KeyboardInterrupt:
 	logging.info('terminated with Ctrl-C')
 except Exception as e:
